@@ -2,18 +2,23 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"strings"
 )
 
 // octNode a node in the
 type octNode struct {
-	uni           Uni
-	children      []octNode
-	parent        *octNode
-	empty         bool
-	x, y, z       float64
-	dx, dy, dz    float64
+	body     Body
+	children []octNode
+	parent   *octNode
+	empty    bool
+	// xyz is the top corner of the cube
+	x, y, z float64
+	// dx,dy,dz is the length width and depth of the cube
+	dx, dy, dz float64
+	// The center of mass of the cube
 	cmx, cmy, cmz float64
+	fx, fy, fz    float64
 	mass          float64
 }
 
@@ -31,10 +36,10 @@ func newOctNode(parent *octNode, x, y, z float64) octNode {
 	return newNode
 }
 
-func buildOcttree(unis []Uni, root *octNode) {
+func buildOcttree(bodys []Body, root *octNode) {
 	// Add points to tree
-	for _, uni := range unis {
-		octInsert(uni, root)
+	for _, body := range bodys {
+		octInsert(body, root)
 	}
 
 	// Remove empty leafs
@@ -42,19 +47,19 @@ func buildOcttree(unis []Uni, root *octNode) {
 
 }
 
-func inside(uni Uni, node octNode) bool {
-	if uni.x >= node.x &&
-		uni.x < node.x+node.dx &&
-		uni.y >= node.y &&
-		uni.y < node.y+node.dy &&
-		uni.z >= node.z &&
-		uni.z < node.z+node.dz {
+func inside(body Body, node octNode) bool {
+	if body.x >= node.x &&
+		body.x < node.x+node.dx &&
+		body.y >= node.y &&
+		body.y < node.y+node.dy &&
+		body.z >= node.z &&
+		body.z < node.z+node.dz {
 		return true
 	}
 	return false
 }
 
-func octInsert(uni Uni, node *octNode) {
+func octInsert(body Body, node *octNode) {
 	// Find the correct node to insert the data into
 	if len((*node).children) > 1 {
 		// Check if the node has children
@@ -62,8 +67,8 @@ func octInsert(uni Uni, node *octNode) {
 		// Loop through the children of the node and
 		// check which leaf the data should be contained
 		for i := 0; i < len((*node).children); i++ {
-			if inside(uni, (*node).children[i]) {
-				octInsert(uni, &(*node).children[i])
+			if inside(body, (*node).children[i]) {
+				octInsert(body, &(*node).children[i])
 			}
 		}
 	} else if !(*node).empty && len((*node).children) == 0 {
@@ -89,23 +94,23 @@ func octInsert(uni Uni, node *octNode) {
 
 		// Insert the original node's data into the correct leaf
 		for i := 0; i < len((*node).children); i++ {
-			if inside((*node).uni, (*node).children[i]) {
-				octInsert((*node).uni, &(*node).children[i])
+			if inside((*node).body, (*node).children[i]) {
+				octInsert((*node).body, &(*node).children[i])
 			}
 		}
 
 		// Find the child to insert the new data in
 		for i := 0; i < len((*node).children); i++ {
-			if inside(uni, (*node).children[i]) {
-				octInsert(uni, &(*node).children[i])
+			if inside(body, (*node).children[i]) {
+				octInsert(body, &(*node).children[i])
 			}
 		}
 
-		(*node).uni = Uni{}
+		(*node).body = Body{}
 	} else if (*node).empty {
 		// if the node is empty then insert the data into
 		// the leaf node
-		(*node).uni = uni
+		(*node).body = body
 		(*node).empty = false
 	}
 }
@@ -125,28 +130,66 @@ func removeEmpty(node *octNode) {
 }
 
 func printOctTree(node *octNode, indents int) {
-	fmt.Printf("%v%v: %v - %v %v,%v,%v\n",
-		strings.Repeat("\t", indents),
-		(*node).uni.name,
-		(*node).empty,
-		(*node).mass,
-		(*node).cmx,
-		(*node).cmy,
-		(*node).cmz,
-	)
+	if !(*node).empty {
+		fmt.Printf("%vNode: %v mass=%v x=%v+%v y=%v+%v z=%v+%v - Body: mass=%v x=%v y=%v z=%v\n",
+			strings.Repeat("\t", indents),
+			(*node).body.name,
+			(*node).mass,
+			(*node).x,
+			(*node).dx,
+			(*node).y,
+			(*node).dy,
+			(*node).z,
+			(*node).dz,
+			(*node).body.mass(),
+			(*node).body.x,
+			(*node).body.y,
+			(*node).body.z,
+		)
+	} else {
+		fmt.Printf("%vNode: %v mass=%v x=%v+%v y=%v+%v z=%v+%v\n",
+			strings.Repeat("\t", indents),
+			(*node).body.name,
+			(*node).mass,
+			(*node).x,
+			(*node).dx,
+			(*node).y,
+			(*node).dy,
+			(*node).z,
+			(*node).dz,
+		)
+	}
 	for i := 0; i < len((*node).children); i++ {
 		if len((*node).children[i].children) > 0 {
 			printOctTree(&(*node).children[i], indents+1)
 		} else {
-			fmt.Printf("%v%v: %v - %v %v,%v,%v\n",
-				strings.Repeat("\t", indents+1),
-				(*node).children[i].uni.name,
-				(*node).children[i].empty,
-				(*node).children[i].mass,
-				(*node).children[i].cmx,
-				(*node).children[i].cmy,
-				(*node).children[i].cmz,
-			)
+			if !(*node).children[i].empty {
+				fmt.Printf("%vNode: %v mass=%v x=%v+%v y=%v+%v z=%v+%v - Body: mass=%v x=%v y=%v z=%v\n",
+					strings.Repeat("\t", indents+1),
+					(*node).children[i].body.name,
+					(*node).children[i].mass,
+					(*node).children[i].x,
+					(*node).children[i].dx,
+					(*node).children[i].y,
+					(*node).children[i].dy,
+					(*node).children[i].z,
+					(*node).children[i].dz,
+					(*node).children[i].body.mass(),
+					(*node).children[i].body.x,
+					(*node).children[i].body.y,
+					(*node).children[i].body.z,
+				)
+			} else {
+				fmt.Printf("%vNode: EMPTY %v+%v, %v+%v, %v+%v\n",
+					strings.Repeat("\t", indents+1),
+					(*node).children[i].x,
+					(*node).children[i].dx,
+					(*node).children[i].y,
+					(*node).children[i].dy,
+					(*node).children[i].z,
+					(*node).children[i].dz,
+				)
+			}
 		}
 	}
 
@@ -190,14 +233,125 @@ func calcMass(node *octNode) (totalMass, cmx, cmy, cmz float64) {
 		return (*node).mass, (*node).cmx, (*node).cmy, (*node).cmz
 
 	} else if len((*node).children) == 0 && !(*node).empty {
-		(*node).mass = float64((*node).uni.noOfStudents) * (*node).uni.greggDensity
-		(*node).cmx = (*node).uni.x
-		(*node).cmy = (*node).uni.y
-		(*node).cmz = (*node).uni.z
+		(*node).mass = (*node).body.mass()
+		(*node).cmx = (*node).body.x
+		(*node).cmy = (*node).body.y
+		(*node).cmz = (*node).body.z
 
 		return (*node).mass, (*node).cmx, (*node).cmy, (*node).cmz
 	}
 
 	return (*node).mass, (*node).cmx, (*node).cmy, (*node).cmz
 
+}
+
+func calcForces(node *octNode) {
+	leafNodes := getLeafNodes(node)
+
+	for i := 0; i < len(leafNodes); i++ {
+		// Get force
+		fx, fy, fz := treeForce(leafNodes[i], node)
+		// apply force
+		(*leafNodes[i]).body = applyForce((*leafNodes[i]).body, fx, fy, fz)
+	}
+}
+
+func treeForce(particle, node *octNode) (fx, fy, fz float64) {
+	// ... Compute gravitational force on particle i
+	// ... due to all particles in the box at n
+	// f = 0
+	// if n contains one particle
+	// 	f = force computed using formula (*) above
+	// else
+	// 	r = distance from particle i to
+	// 		   center of mass of particles in n
+	// 	D = size of box n
+	// 	if D/r < theta
+	// 		compute f using formula (*) above
+	// 	else
+	// 		for all children c of n
+	// 			f = f + TreeForce(i,c)
+	// 		end for
+	// 	end if
+	// end if
+
+	// force = G * m * mcm *
+	//             xcm - x       ycm - y         zcm - z
+	//           ( ---------- , ---------- , ---------- )
+	//                r3            r3            r3
+
+	// r = sqrt(   ( xcm - x )2
+	//         + ( ycm - y )2
+	//         + ( zcm - z )2 )
+
+	// Do not calculate the force on its self
+	if particle.body == node.body {
+		return 0, 0, 0
+	}
+
+	dx := (*node).cmx - (*particle).body.x
+	dy := (*node).cmy - (*particle).body.y
+	dz := (*node).cmz - (*particle).body.z
+
+	r := math.Sqrt(dx*dx + dy*dy + dz*dz)
+
+	size := (*node).dx * (*node).dy * (*node).dz
+
+	// if the node is a leaf
+	if len((*node).children) == 0 && !(*node).empty {
+		// Calc force on particle
+
+		fx = grav * (*particle).mass * (*node).mass * (((*node).cmx - (*particle).body.x) / (r * r * r))
+		fy = grav * (*particle).mass * (*node).mass * (((*node).cmy - (*particle).body.y) / (r * r * r))
+		fz = grav * (*particle).mass * (*node).mass * (((*node).cmz - (*particle).body.z) / (r * r * r))
+
+		return fx, fy, fz
+	}
+
+	if size/r < theta {
+		// Calc force
+
+		fx = grav * (*particle).mass * (*node).mass * (((*node).cmx - (*particle).body.x) / (r * r * r))
+		fy = grav * (*particle).mass * (*node).mass * (((*node).cmy - (*particle).body.y) / (r * r * r))
+		fz = grav * (*particle).mass * (*node).mass * (((*node).cmz - (*particle).body.z) / (r * r * r))
+
+		return fx, fy, fz
+	}
+
+	for i := 0; i < len((*node).children); i++ {
+		ifx, ify, ifz := treeForce(particle, &(*node).children[i])
+		fx += ifx
+		fy += ify
+		fz += ifz
+	}
+
+	return fx, fy, fz
+}
+
+func applyForce(body Body, fx, fy, fz float64) Body {
+	body.x = body.x + fx
+	body.y = body.y + fy
+	body.z = body.z + fz
+	return body
+}
+
+func getLeafNodes(node *octNode) (leafNodes []*octNode) {
+	if len((*node).children) > 0 {
+		for i := 0; i < len((*node).children); i++ {
+			tmpLeafNodes := getLeafNodes(&(*node).children[i])
+			leafNodes = append(leafNodes, tmpLeafNodes...)
+		}
+	} else if len((*node).children) == 0 && !(*node).empty {
+		leafNodes = append(leafNodes, node)
+	}
+
+	return leafNodes
+}
+
+func getBodies(node *octNode) (bodies []Body) {
+	leafNodes := getLeafNodes(node)
+	for i := 0; i < len(leafNodes); i++ {
+		bodies = append(bodies, leafNodes[i].body)
+	}
+	return bodies
 }
