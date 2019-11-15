@@ -1,5 +1,6 @@
 package main
 
+// main this is run when the program is executed.
 func main() {
 
 	bodies := []Body{
@@ -11,3 +12,4 @@ func main() {
 
 	xSteps(3, bodies)
 }
+s

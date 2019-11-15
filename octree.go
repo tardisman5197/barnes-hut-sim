@@ -6,22 +6,38 @@ import (
 	"strings"
 )
 
-// octNode a node in the
+// octNode represents a cube in 3D space
+// organised in a tree.
 type octNode struct {
-	body     Body
+	// Body is struct containing the data about each object
+	// in space
+	body Body
+	// childeren is a slice of nodes that are contained by
+	// the node
 	children []octNode
-	parent   *octNode
-	empty    bool
+	// parent is a pointer to the node of which this node
+	// is a child to
+	parent *octNode
+	// empty is true if it contains no body
+	empty bool
 	// xyz is the top corner of the cube
 	x, y, z float64
-	// dx,dy,dz is the length width and depth of the cube
+	// dx, dy, dz is the length width and depth of the cube
 	dx, dy, dz float64
 	// The center of mass of the cube
 	cmx, cmy, cmz float64
-	fx, fy, fz    float64
-	mass          float64
+	// fx. fy, fz is the force that should be applied to
+	// the cube
+	fx, fy, fz float64
+	// mass is the total mass of all its self and children
+	// nodes
+	mass float64
 }
 
+// newOctNode child node of the parent at a given position
+// the size of the node is half in every direction of the
+// parent node. The new node does not contain any children
+// and is empty when returned.
 func newOctNode(parent *octNode, x, y, z float64) octNode {
 	newNode := octNode{}
 	newNode.parent = parent
@@ -36,9 +52,58 @@ func newOctNode(parent *octNode, x, y, z float64) octNode {
 	return newNode
 }
 
-func buildOcttree(bodys []Body, root *octNode) {
+// createRootNode creates an empty node with a size and position
+// which encompasses all of the bodies provided.
+func createRootNode(bodies []Body) octNode {
+	// find the lowest and highest coordinates
+	lx, ly, lz := math.MaxFloat64, math.MaxFloat64, math.MaxFloat64
+	hx, hy, hz := -math.MaxFloat64, -math.MaxFloat64, -math.MaxFloat64
+	for i := 0; i < len(bodies); i++ {
+		// Check if the body is in a higher
+		// position
+		if bodies[i].x > hx {
+			hx = bodies[i].x + 1
+		}
+		if bodies[i].y > hy {
+			hy = bodies[i].y + 1
+		}
+		if bodies[i].z > hz {
+			hz = bodies[i].z + 1
+		}
+
+		// Check if the body is in a lower
+		// position
+		if bodies[i].x < lx {
+			lx = bodies[i].x - 1
+		}
+		if bodies[i].y < ly {
+			ly = bodies[i].y - 1
+		}
+		if bodies[i].z < lz {
+			lz = bodies[i].z - 1
+		}
+	}
+
+	// create the root node
+	root := octNode{
+		children: make([]octNode, 0),
+		empty:    true,
+		x:        lx,
+		y:        ly,
+		z:        lz,
+		dx:       hx - lx,
+		dy:       hy - ly,
+		dz:       hz - lz,
+	}
+
+	return root
+}
+
+// buildOctTree creates a new oct tree from a root node
+// and a list of bodies.
+func buildOcttree(bodies []Body, root *octNode) {
 	// Add points to tree
-	for _, body := range bodys {
+	for _, body := range bodies {
 		octInsert(body, root)
 	}
 
@@ -47,18 +112,9 @@ func buildOcttree(bodys []Body, root *octNode) {
 
 }
 
-func inside(body Body, node octNode) bool {
-	if body.x >= node.x &&
-		body.x < node.x+node.dx &&
-		body.y >= node.y &&
-		body.y < node.y+node.dy &&
-		body.z >= node.z &&
-		body.z < node.z+node.dz {
-		return true
-	}
-	return false
-}
-
+// octInsert inserts a body into a oct tree based on the new
+// body's position. If the node that should contain the new
+// body is already filled that node is split into 8 smaller nodes.
 func octInsert(body Body, node *octNode) {
 	// Find the correct node to insert the data into
 	if len((*node).children) > 1 {
@@ -74,7 +130,7 @@ func octInsert(body Body, node *octNode) {
 	} else if !(*node).empty && len((*node).children) == 0 {
 		// if the node is not empty and does not have any children
 		// split the node into 8 empty leafs.
-		// Then insert the orginal node's data into a new leaf.
+		// Then insert the original node's data into a new leaf.
 		// Find the leaf for the new data and insert it.
 
 		// Create the new leafs
@@ -107,6 +163,7 @@ func octInsert(body Body, node *octNode) {
 		}
 
 		(*node).body = Body{}
+
 	} else if (*node).empty {
 		// if the node is empty then insert the data into
 		// the leaf node
@@ -115,6 +172,22 @@ func octInsert(body Body, node *octNode) {
 	}
 }
 
+// inside is true if the Body is within the given
+// node.
+func inside(body Body, node octNode) bool {
+	if body.x >= node.x &&
+		body.x < node.x+node.dx &&
+		body.y >= node.y &&
+		body.y < node.y+node.dy &&
+		body.z >= node.z &&
+		body.z < node.z+node.dz {
+		return true
+	}
+	return false
+}
+
+// removeEmpty prunes the oct tree of any empty nodes
+// with no children.
 func removeEmpty(node *octNode) {
 	// remove any emptyleaf nodes
 	for i := len((*node).children) - 1; i >= 0; i-- {
@@ -129,6 +202,8 @@ func removeEmpty(node *octNode) {
 	}
 }
 
+// printOctTree prints out the nodes in the oct tree
+// to stdout.
 func printOctTree(node *octNode, indents int) {
 	if !(*node).empty {
 		fmt.Printf("%vNode: %v mass=%v x=%v+%v y=%v+%v z=%v+%v - Body: mass=%v x=%v y=%v z=%v\n",
@@ -195,37 +270,34 @@ func printOctTree(node *octNode, indents int) {
 
 }
 
+// calcMass traverses an oct tree calculating the accumulative
+// mass of each of a nodes children and calculates the position
+// of the node's center of mass
 func calcMass(node *octNode) (totalMass, cmx, cmy, cmz float64) {
-	// ... Compute the mass and center of mass (cm) of
-	//    ... all the particles in the subtree rooted at n
-	//    if n contains 1 particle
-	//         ... the mass and cm of n are identical to
-	//         ... the particle's mass and position
-	//         store ( mass, cm ) at n
-	//         return ( mass, cm )
-	//    else
-	//         for all four children c(i) of n (i=1,2,3,4)
-	//             ( mass(i), cm(i) ) = Compute_Mass(c(i))
-	//         end for
-	//         mass = mass(1) + mass(2) + mass(3) + mass(4)
-	//              ... the mass of a node is the sum of
-	//              ... the masses of the children
-	//         cm = (  mass(1)*cm(1) + mass(2)*cm(2)
-	//               + mass(3)*cm(3) + mass(4)*cm(4)) / mass
-	//              ... the cm of a node is a weighted sum of
-	//              ... the cm's of the children
-	//         store ( mass, cm ) a
+
 	if len((*node).children) > 0 {
+		// If the node has children work out the mass of all of the
+		// children and calculate the center of mass of its children
 		for i := 0; i < len((*node).children); i++ {
+			// find the mass and center of each child
 			cMass, cx, cy, cz := calcMass(&(*node).children[i])
 			totalMass += cMass
-			// Calculate center of mass
+
 			cmx += cx * cMass
 			cmy += cy * cMass
 			cmz += cz * cMass
 		}
 
+		// The mass of the node is the sum of all
+		// children's masses
 		(*node).mass = totalMass
+
+		// The center of mass for the node is
+		// sum of the product of each child's mass
+		// and center, divided by the total mass of
+		// all children nodes.
+		//
+		// cm = sum(childMass * childCenter) / sum(childrenMass)
 		(*node).cmx = cmx / totalMass
 		(*node).cmy = cmx / totalMass
 		(*node).cmz = cmx / totalMass
@@ -233,6 +305,9 @@ func calcMass(node *octNode) (totalMass, cmx, cmy, cmz float64) {
 		return (*node).mass, (*node).cmx, (*node).cmy, (*node).cmz
 
 	} else if len((*node).children) == 0 && !(*node).empty {
+		// If the node is a leaf node, a node with a body and no children,
+		// the mass of the node is calculated by the mass of the body
+		// and the center of mass is just the body's position
 		(*node).mass = (*node).body.mass()
 		(*node).cmx = (*node).body.x
 		(*node).cmy = (*node).body.y
@@ -241,53 +316,44 @@ func calcMass(node *octNode) (totalMass, cmx, cmy, cmz float64) {
 		return (*node).mass, (*node).cmx, (*node).cmy, (*node).cmz
 	}
 
+	// In this case the node is empty and the mass and center
+	// of mass is 0
 	return (*node).mass, (*node).cmx, (*node).cmy, (*node).cmz
 
 }
 
+// calcForces calculates the force that would be applied
+// to each body in the oct tree and then applies that force
+// to each body.
 func calcForces(node *octNode) {
 	leafNodes := getLeafNodes(node)
 
 	for i := 0; i < len(leafNodes); i++ {
-		// Get force
+		// Calculate the force applied to that Body
 		fx, fy, fz := treeForce(leafNodes[i], node)
-		// apply force
-		(*leafNodes[i]).body = applyForce((*leafNodes[i]).body, fx, fy, fz)
+		// Apply force to the body
+		(*leafNodes[i]).body.applyForce(fx, fy, fz)
 	}
 }
 
+// treeForce calculates the force that should be applied to
+// a particle based on a oct tree.
 func treeForce(particle, node *octNode) (fx, fy, fz float64) {
-	// ... Compute gravitational force on particle i
-	// ... due to all particles in the box at n
-	// f = 0
-	// if n contains one particle
-	// 	f = force computed using formula (*) above
-	// else
-	// 	r = distance from particle i to
-	// 		   center of mass of particles in n
-	// 	D = size of box n
-	// 	if D/r < theta
-	// 		compute f using formula (*) above
-	// 	else
-	// 		for all children c of n
-	// 			f = f + TreeForce(i,c)
-	// 		end for
-	// 	end if
-	// end if
-
 	// force = G * m * mcm *
 	//             xcm - x       ycm - y         zcm - z
 	//           ( ---------- , ---------- , ---------- )
 	//                r3            r3            r3
 
-	// r = sqrt(   ( xcm - x )2
-	//         + ( ycm - y )2
-	//         + ( zcm - z )2 )
-
 	// Do not calculate the force on its self
 	if particle.body == node.body {
 		return 0, 0, 0
 	}
+
+	// 	r = distance from particle i to
+	// 		   center of mass of particles in n
+	//    = sqrt(   ( xcm - x )2
+	//         + ( ycm - y )2
+	//         + ( zcm - z )2 )
 
 	dx := (*node).cmx - (*particle).body.x
 	dy := (*node).cmy - (*particle).body.y
@@ -297,10 +363,9 @@ func treeForce(particle, node *octNode) (fx, fy, fz float64) {
 
 	size := (*node).dx * (*node).dy * (*node).dz
 
-	// if the node is a leaf
+	// If the node is a leaf containing a body
 	if len((*node).children) == 0 && !(*node).empty {
-		// Calc force on particle
-
+		// Calculate the force on particle
 		fx = grav * (*particle).mass * (*node).mass * (((*node).cmx - (*particle).body.x) / (r * r * r))
 		fy = grav * (*particle).mass * (*node).mass * (((*node).cmy - (*particle).body.y) / (r * r * r))
 		fz = grav * (*particle).mass * (*node).mass * (((*node).cmz - (*particle).body.z) / (r * r * r))
@@ -309,8 +374,7 @@ func treeForce(particle, node *octNode) (fx, fy, fz float64) {
 	}
 
 	if size/r < theta {
-		// Calc force
-
+		// Calc the force on particle
 		fx = grav * (*particle).mass * (*node).mass * (((*node).cmx - (*particle).body.x) / (r * r * r))
 		fy = grav * (*particle).mass * (*node).mass * (((*node).cmy - (*particle).body.y) / (r * r * r))
 		fz = grav * (*particle).mass * (*node).mass * (((*node).cmz - (*particle).body.z) / (r * r * r))
@@ -319,6 +383,8 @@ func treeForce(particle, node *octNode) (fx, fy, fz float64) {
 	}
 
 	for i := 0; i < len((*node).children); i++ {
+		// Calculate the resulting force of all
+		// of the nodes children's forces
 		ifx, ify, ifz := treeForce(particle, &(*node).children[i])
 		fx += ifx
 		fy += ify
@@ -328,28 +394,32 @@ func treeForce(particle, node *octNode) (fx, fy, fz float64) {
 	return fx, fy, fz
 }
 
-func applyForce(body Body, fx, fy, fz float64) Body {
-	body.x = body.x + fx
-	body.y = body.y + fy
-	body.z = body.z + fz
-	return body
-}
-
+// getLeafNodes returns a list of all the nodes that contain
+// a body.
 func getLeafNodes(node *octNode) (leafNodes []*octNode) {
+	// If the node has children, check each child for
+	// leaf nodes
 	if len((*node).children) > 0 {
 		for i := 0; i < len((*node).children); i++ {
 			tmpLeafNodes := getLeafNodes(&(*node).children[i])
 			leafNodes = append(leafNodes, tmpLeafNodes...)
 		}
 	} else if len((*node).children) == 0 && !(*node).empty {
+		// Found a leaf node return add the node to be
+		// returned
 		leafNodes = append(leafNodes, node)
 	}
 
 	return leafNodes
 }
 
+// getBodies returns all of the Body struts stored
+// in a oct tree
 func getBodies(node *octNode) (bodies []Body) {
+	// Get all the leaf nodes in the oct tree
 	leafNodes := getLeafNodes(node)
+	// Retreive the body's attached to each
+	// leaf node
 	for i := 0; i < len(leafNodes); i++ {
 		bodies = append(bodies, leafNodes[i].body)
 	}
