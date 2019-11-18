@@ -12,4 +12,3 @@ func main() {
 
 	xSteps(3, bodies)
 }
-s
