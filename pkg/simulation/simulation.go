@@ -47,8 +47,8 @@ func (s *Simulation) oneStep(bodies []Body) []Body {
 	return root.GetBodies()
 }
 
-// XSteps simulates a number of steps in a simulation
-func (s *Simulation) XSteps(steps int) []Body {
+// Steps simulates a number of steps in a simulation
+func (s *Simulation) Steps(steps int) []Body {
 	for i := 0; i < steps; i++ {
 		fmt.Printf("---------- Step %v ----------\n", i)
 		s.Bodies = s.oneStep(s.Bodies)
