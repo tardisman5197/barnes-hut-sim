@@ -7,9 +7,26 @@ import (
 // Simulation holds all of the functionality
 // to start a barnes hut simulation.
 type Simulation struct {
-	grav   float64
-	theta  float64
+	// grav is the gravitational constant used to calculate
+	// the forces between bodies.
+	grav float64
+	// theta is used to determine what granularity
+	// to which to calculate the forces for each Body.
+	// Between 1 and 0, 1 being full granularity.
+	theta float64
+	// Bodies stores the list of bodies within the simulation
 	Bodies []Body
+}
+
+// NewSimulation returns an instance of a Simulation
+// struct. It initilises some simulation paramaters
+// and can optionally set the bodies for the simulation.
+func NewSimulation(grav, theta float64, bodies ...Body) Simulation {
+	return Simulation{
+		grav:   grav,
+		theta:  theta,
+		Bodies: bodies,
+	}
 }
 
 // oneStep simulates on tick in the a simulation

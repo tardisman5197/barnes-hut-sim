@@ -12,7 +12,7 @@ type OctNode struct {
 	// Body is struct containing the data about each object
 	// in space
 	body Body
-	// childeren is a slice of nodes that are contained by
+	// children is a slice of nodes that are contained by
 	// the node
 	children []OctNode
 	// parent is a pointer to the node of which this node
@@ -331,22 +331,22 @@ func (n *OctNode) CalcForces(grav, theta float64) {
 
 	for i := 0; i < len(leafNodes); i++ {
 		// Calculate the force applied to that Body
-		fx, fy, fz := treeForce(leafNodes[i], n, grav, theta)
+		fx, fy, fz := leafNodes[i].treeForce(*n, grav, theta)
 		// Apply force to the body
 		(*leafNodes[i]).body.applyForce(fx, fy, fz)
 	}
 }
 
 // treeForce calculates the force that should be applied to
-// a particle based on a oct tree.
-func treeForce(particle, node *OctNode, grav, theta float64) (fx, fy, fz float64) {
+// a node based on a oct tree.
+func (n *OctNode) treeForce(tree OctNode, grav, theta float64) (fx, fy, fz float64) {
 	// force = G * m * mcm *
 	//             xcm - x       ycm - y         zcm - z
 	//           ( ---------- , ---------- , ---------- )
 	//                r3            r3            r3
 
 	// Do not calculate the force on its self
-	if particle.body == node.body {
+	if n.body == tree.body {
 		return 0, 0, 0
 	}
 
@@ -356,37 +356,37 @@ func treeForce(particle, node *OctNode, grav, theta float64) (fx, fy, fz float64
 	//         + ( ycm - y )2
 	//         + ( zcm - z )2 )
 
-	dx := (*node).cmx - (*particle).body.X
-	dy := (*node).cmy - (*particle).body.Y
-	dz := (*node).cmz - (*particle).body.Z
+	dx := tree.cmx - n.body.X
+	dy := tree.cmy - n.body.Y
+	dz := tree.cmz - n.body.Z
 
 	r := math.Sqrt(dx*dx + dy*dy + dz*dz)
 
-	size := (*node).dx * (*node).dy * (*node).dz
+	size := tree.dx * tree.dy * tree.dz
 
 	// If the node is a leaf containing a body
-	if len((*node).children) == 0 && !(*node).empty {
+	if len(tree.children) == 0 && !tree.empty {
 		// Calculate the force on particle
-		fx = grav * (*particle).mass * (*node).mass * (((*node).cmx - (*particle).body.X) / (r * r * r))
-		fy = grav * (*particle).mass * (*node).mass * (((*node).cmy - (*particle).body.Y) / (r * r * r))
-		fz = grav * (*particle).mass * (*node).mass * (((*node).cmz - (*particle).body.Z) / (r * r * r))
+		fx = grav * n.mass * tree.mass * ((tree.cmx - n.body.X) / (r * r * r))
+		fy = grav * n.mass * tree.mass * ((tree.cmy - n.body.Y) / (r * r * r))
+		fz = grav * n.mass * tree.mass * ((tree.cmz - n.body.Z) / (r * r * r))
 
 		return fx, fy, fz
 	}
 
 	if size/r < theta {
 		// Calc the force on particle
-		fx = grav * (*particle).mass * (*node).mass * (((*node).cmx - (*particle).body.Z) / (r * r * r))
-		fy = grav * (*particle).mass * (*node).mass * (((*node).cmy - (*particle).body.Y) / (r * r * r))
-		fz = grav * (*particle).mass * (*node).mass * (((*node).cmz - (*particle).body.Z) / (r * r * r))
+		fx = grav * n.mass * tree.mass * ((tree.cmx - n.body.Z) / (r * r * r))
+		fy = grav * n.mass * tree.mass * ((tree.cmy - n.body.Y) / (r * r * r))
+		fz = grav * n.mass * tree.mass * ((tree.cmz - n.body.Z) / (r * r * r))
 
 		return fx, fy, fz
 	}
 
-	for i := 0; i < len((*node).children); i++ {
+	for i := 0; i < len(tree.children); i++ {
 		// Calculate the resulting force of all
 		// of the nodes children's forces
-		ifx, ify, ifz := treeForce(particle, &(*node).children[i], grav, theta)
+		ifx, ify, ifz := n.treeForce(tree.children[i], grav, theta)
 		fx += ifx
 		fy += ify
 		fz += ifz

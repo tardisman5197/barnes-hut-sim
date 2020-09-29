@@ -21,5 +21,6 @@ func main() {
 		simulation.Body{Name: "stuff", X: 1.0, Y: 10.0, Z: 1.0, Radius: 1, Density: 1},
 	}
 
-	simulation.XSteps(3, bodies, grav, theta)
+	simulation := simulation.NewSimulation(grav, theta, bodies...)
+	simulation.XSteps(10)
 }
