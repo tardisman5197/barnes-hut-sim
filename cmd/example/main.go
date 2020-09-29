@@ -22,5 +22,5 @@ func main() {
 	}
 
 	simulation := simulation.NewSimulation(grav, theta, bodies...)
-	simulation.XSteps(10)
+	simulation.Steps(10)
 }
