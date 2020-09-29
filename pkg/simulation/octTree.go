@@ -12,7 +12,7 @@ type OctNode struct {
 	// Body is struct containing the data about each object
 	// in space
 	body Body
-	// childeren is a slice of nodes that are contained by
+	// children is a slice of nodes that are contained by
 	// the node
 	children []OctNode
 	// parent is a pointer to the node of which this node

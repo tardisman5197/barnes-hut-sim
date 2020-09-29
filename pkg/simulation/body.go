@@ -6,14 +6,16 @@ import "math"
 // within the simulation
 type Body struct {
 	// Name stores the identifer of the body
-	Name string
+	Name string `json:"name"`
 	// X, Y, Z stores the position of the body
-	X, Y, Z float64
+	X float64 `json:"x"`
+	Y float64 `json:"y"`
+	Z float64 `json:"z"`
 	// Radius stores the radius of the body's sphere
-	Radius float64
+	Radius float64 `json:"radius"`
 	// Density stores the density of the material
 	// of the body
-	Density float64
+	Density float64 `json:"density"`
 }
 
 // mass calculates the mass of the Body based
