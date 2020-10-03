@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -14,6 +15,7 @@ import (
 type API struct {
 	server *http.Server
 
+	mutex       *sync.Mutex
 	simulations map[string]simulation.Simulation
 }
 
@@ -21,6 +23,7 @@ type API struct {
 func NewAPI() API {
 	var a API
 	a.setup()
+	a.mutex = &sync.Mutex{}
 	a.simulations = make(map[string]simulation.Simulation)
 	return a
 }
