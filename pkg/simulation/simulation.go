@@ -9,13 +9,15 @@ import (
 type Simulation struct {
 	// grav is the gravitational constant used to calculate
 	// the forces between bodies.
-	grav float64
+	Grav float64 `json:"grav"`
 	// theta is used to determine what granularity
 	// to which to calculate the forces for each Body.
 	// Between 1 and 0, 1 being full granularity.
-	theta float64
+	Theta float64 `json:"theta"`
 	// Bodies stores the list of bodies within the simulation
-	Bodies []Body
+	Bodies []Body `json:"bodies"`
+	// Step the current number of steps that has taken place.
+	Step int `json:"step"`
 }
 
 // NewSimulation returns an instance of a Simulation
@@ -23,8 +25,8 @@ type Simulation struct {
 // and can optionally set the bodies for the simulation.
 func NewSimulation(grav, theta float64, bodies ...Body) Simulation {
 	return Simulation{
-		grav:   grav,
-		theta:  theta,
+		Grav:   grav,
+		Theta:  theta,
 		Bodies: bodies,
 	}
 }
@@ -39,7 +41,7 @@ func (s *Simulation) oneStep(bodies []Body) []Body {
 	// Calculate and apply the forces to all
 	// the bodes in the simulation for a single
 	// tick.
-	root.CalcForces(s.grav, s.theta)
+	root.CalcForces(s.Grav, s.Theta)
 
 	// Display the resulting oct tree
 	fmt.Println(root.String(0))
@@ -50,7 +52,8 @@ func (s *Simulation) oneStep(bodies []Body) []Body {
 // Steps simulates a number of steps in a simulation
 func (s *Simulation) Steps(steps int) []Body {
 	for i := 0; i < steps; i++ {
-		fmt.Printf("---------- Step %v ----------\n", i)
+		s.Step++
+		fmt.Printf("---------- Step %v ----------\n", s.Step)
 		s.Bodies = s.oneStep(s.Bodies)
 	}
 	return s.Bodies
