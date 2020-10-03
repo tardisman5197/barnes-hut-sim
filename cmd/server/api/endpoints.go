@@ -79,9 +79,6 @@ func (a *API) newSimulation(w http.ResponseWriter, r *http.Request) {
 func (a *API) start(w http.ResponseWriter, r *http.Request) {
 	log.Println(r.URL.Path)
 
-	a.mutex.Lock()
-	defer a.mutex.Unlock()
-
 	// Retrieve path parameters
 	vars := mux.Vars(r)
 	simID := vars["simID"]
