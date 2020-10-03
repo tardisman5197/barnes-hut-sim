@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"github.com/gorilla/mux"
 	"net/http"
+	"strconv"
 
+	"github.com/gorilla/mux"
 	"github.com/tardisman5197/barnes-hut-sim/pkg/simulation"
 )
 
@@ -68,7 +70,53 @@ func (a *API) newSimulation(w http.ResponseWriter, r *http.Request) {
 // a certain number of steps.
 func (a *API) start(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Start Simulation Request")
-	w.WriteHeader(http.StatusNotImplemented)
+
+	// Retrieve path parameters
+	vars := mux.Vars(r)
+	simID := vars["simID"]
+
+	// Convert steps param to int
+	steps, err := strconv.Atoi(vars["steps"])
+	if err != nil {
+		if e, ok := err.(*strconv.NumError); ok && e.Err == strconv.ErrSyntax {
+			http.Error(w, fmt.Errorf("the steps parameter must be an integer").Error(), http.StatusBadRequest)
+		} else {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		}
+		return
+	}
+
+	// Check if a simulation has been created before
+	if _, ok := a.simulations[simID]; !ok {
+		http.Error(w, fmt.Errorf("there is no simulation with the simID %s", simID).Error(), http.StatusNotFound)
+		return
+	}
+
+	sim := a.simulations[simID]
+
+	// Steps must be positive
+	if steps <= 0 {
+		http.Error(w, fmt.Errorf("the steps parameter must be strictly positive").Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Perform the number of steps on the simulation
+	bodies := sim.Steps(steps)
+
+	type StartSimulationResponse struct {
+		ID     string            `json:"id"`
+		Bodies []simulation.Body `json:"bodies"`
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+	// Report the current status
+	json.NewEncoder(w).Encode(
+		StartSimulationResponse{
+			ID:     simID,
+			Bodies: bodies,
+		},
+	)
 }
 
 // status is called when a request is made to "/simulation/status/{simID}".
