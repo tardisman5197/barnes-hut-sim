@@ -78,6 +78,7 @@ func TestMain(m *testing.M) {
 
 func TestStart(t *testing.T) {
 	for _, test := range testsStart {
+		t.Logf("Test case: %s", test.description)
 		r, err := http.Get(StartURL + test.given)
 		if err != nil {
 			t.Fatal(err)
