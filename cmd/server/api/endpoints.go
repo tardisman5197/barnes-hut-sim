@@ -24,10 +24,11 @@ type NewSimulationResponse struct {
 }
 
 // StartSimulationResponse is the format response of /start endpoint.
-// It contains the simID targeted and the bodies list of the last step.
+// It contains the simID targeted and the current status of the simulation
+// (ie. if all goes fine "running").
 type StartSimulationResponse struct {
-	ID     string            `json:"id"`
-	Bodies []simulation.Body `json:"bodies"`
+	ID     string `json:"id"`
+	Status string `json:"status"`
 }
 
 // newSimulation is called when a request is made to "/simulation/new".
@@ -79,6 +80,9 @@ func (a *API) newSimulation(w http.ResponseWriter, r *http.Request) {
 func (a *API) start(w http.ResponseWriter, r *http.Request) {
 	log.Println(r.URL.Path)
 
+	a.mutex.RLock()
+	defer a.mutex.RUnlock()
+
 	// Retrieve path parameters
 	vars := mux.Vars(r)
 	simID := vars["simID"]
@@ -100,8 +104,6 @@ func (a *API) start(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sim := a.simulations[simID]
-
 	// Steps must be positive
 	if steps <= 0 {
 		http.Error(w, fmt.Errorf("the 'steps' parameter must be strictly positive").Error(), http.StatusBadRequest)
@@ -109,7 +111,29 @@ func (a *API) start(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Perform the number of steps on the simulation
-	bodies := sim.Steps(steps)
+	go func() {
+		// Make a deep copy of the simulation targeted
+		a.mutex.RLock()
+		sim := a.simulations[simID]
+		sim.Bodies = make([]simulation.Body, len(a.simulations[simID].Bodies))
+		copy(sim.Bodies, a.simulations[simID].Bodies)
+		a.mutex.RUnlock()
+
+		sim.Steps(steps)
+
+		// Check if it has not been deleted during processing
+		a.mutex.RLock()
+		if _, ok := a.simulations[simID]; !ok {
+			a.mutex.RUnlock()
+			return
+		}
+		a.mutex.RUnlock()
+
+		// Once this is done copy back to the original
+		a.mutex.Lock()
+		defer a.mutex.Unlock()
+		copy(a.simulations[simID].Bodies, sim.Bodies)
+	}()
 
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
@@ -117,7 +141,7 @@ func (a *API) start(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(
 		StartSimulationResponse{
 			ID:     simID,
-			Bodies: bodies,
+			Status: "running",
 		},
 	)
 }
