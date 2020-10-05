@@ -80,9 +80,6 @@ func (a *API) newSimulation(w http.ResponseWriter, r *http.Request) {
 func (a *API) start(w http.ResponseWriter, r *http.Request) {
 	log.Println(r.URL.Path)
 
-	a.mutex.RLock()
-	defer a.mutex.RUnlock()
-
 	// Retrieve path parameters
 	vars := mux.Vars(r)
 	simID := vars["simID"]
@@ -98,11 +95,13 @@ func (a *API) start(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	a.mutex.RLock()
 	// Check if a simulation has been created before
 	if _, ok := a.simulations[simID]; !ok {
 		http.Error(w, fmt.Errorf("there is no simulation with the simID %s", simID).Error(), http.StatusNotFound)
 		return
 	}
+	a.mutex.RUnlock()
 
 	// Steps must be positive
 	if steps <= 0 {
