@@ -15,7 +15,7 @@ import (
 type API struct {
 	server *http.Server
 
-	mutex       *sync.Mutex
+	mutex       *sync.RWMutex
 	simulations map[string]simulation.Simulation
 }
 
@@ -23,7 +23,7 @@ type API struct {
 func NewAPI() API {
 	var a API
 	a.setup()
-	a.mutex = &sync.Mutex{}
+	a.mutex = &sync.RWMutex{}
 	a.simulations = make(map[string]simulation.Simulation)
 	return a
 }
