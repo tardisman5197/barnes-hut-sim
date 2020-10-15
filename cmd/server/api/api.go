@@ -28,15 +28,19 @@ func NewAPI() API {
 	return a
 }
 
-// setup creates the http server.
-func (a *API) setup() {
+func (a *API) router() *mux.Router {
 	r := mux.NewRouter()
 	r.HandleFunc("/simulation/new", a.newSimulation).Methods("POST")
 	r.HandleFunc("/simulation/start/{simID}/{steps}", a.start).Methods("GET")
 	r.HandleFunc("/simulation/status/{simID}", a.status).Methods("GET")
 	r.HandleFunc("/simulation/results/{simID}", a.results).Methods("GET")
 	r.HandleFunc("/simulation/remove/{simID}", a.remove).Methods("GET")
+	return r
+}
 
+// setup creates the http server.
+func (a *API) setup() {
+	r := a.router()
 	a.server = &http.Server{
 		Handler:      r,
 		Addr:         ":5000",

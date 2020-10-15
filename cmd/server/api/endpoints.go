@@ -153,12 +153,44 @@ func (a *API) status(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+type simulationResultResponse struct {
+	Simulation simulation.Simulation `json:"simulation"`
+}
+
 // results is called when a request is made to "/simulation/results/{simID}".
 // This endpoint will return the results of the simulation with
 // the ID specified.
 func (a *API) results(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("Results Simulation Request")
-	w.WriteHeader(http.StatusNotImplemented)
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
+
+	vars := mux.Vars(r)
+
+	simID, hasSimID := vars["simID"]
+	if !hasSimID {
+		http.Error(w, "simulation id not provided", http.StatusBadRequest)
+		return
+	}
+
+	sim, present := a.simulations[simID]
+	if !present {
+		http.Error(w, fmt.Sprintf("simulation with id %s not present", simID), http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	err := json.NewEncoder(w).Encode(
+		simulationResultResponse{
+			Simulation: sim,
+		},
+	)
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
 }
 
 // remove is called when a request is made to "/simulation/remove/{simID}".
