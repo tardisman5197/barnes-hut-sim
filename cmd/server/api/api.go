@@ -16,7 +16,7 @@ type API struct {
 	server *http.Server
 
 	mutex       *sync.RWMutex
-	simulations map[string]simulation.Simulation
+	simulations map[string]*simulation.Simulation
 }
 
 // NewAPI returns an instance of an API struct.
@@ -24,7 +24,7 @@ func NewAPI() API {
 	var a API
 	a.setup()
 	a.mutex = &sync.RWMutex{}
-	a.simulations = make(map[string]simulation.Simulation)
+	a.simulations = make(map[string]*simulation.Simulation)
 	return a
 }
 

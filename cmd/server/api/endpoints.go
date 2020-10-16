@@ -19,8 +19,8 @@ type NewSimulationRequest struct {
 }
 
 type NewSimulationResponse struct {
-	ID         string                `json:"id"`
-	Simulation simulation.Simulation `json:"simulation"`
+	ID         string                 `json:"id"`
+	Simulation *simulation.Simulation `json:"simulation"`
 }
 
 // StartSimulationResponse is the format response of /start endpoint.
@@ -29,6 +29,13 @@ type NewSimulationResponse struct {
 type StartSimulationResponse struct {
 	ID     string `json:"id"`
 	Status string `json:"status"`
+}
+
+// StatusSimulationResponse is response object for the /status endpoint.
+// ID represent the id of the job and step the no of steps
+type StatusSimulationResponse struct {
+	ID   string `json:"id"`
+	Step int    `json:"step"`
 }
 
 // newSimulation is called when a request is made to "/simulation/new".
@@ -149,12 +156,34 @@ func (a *API) start(w http.ResponseWriter, r *http.Request) {
 // This endpoint will return the status of the simulation with
 // the specified simulation ID.
 func (a *API) status(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("Status Simulation Request")
-	w.WriteHeader(http.StatusNotImplemented)
+	log.Println(r.URL.Path)
+
+	// Retrieve path parameters
+	vars := mux.Vars(r)
+	simID := vars["simID"]
+
+	a.mutex.RLock()
+	// Check if a simulation has been created before
+	sim, ok := a.simulations[simID]
+	if !ok {
+		http.Error(w, fmt.Errorf("there is no simulation with the simID %s", simID).Error(), http.StatusNotFound)
+		return
+	}
+	a.mutex.RUnlock()
+
+	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+	// Report the current status
+	json.NewEncoder(w).Encode(
+		StatusSimulationResponse{
+			ID:   simID,
+			Step: sim.Step,
+		},
+	)
 }
 
 type simulationResultResponse struct {
-	Simulation simulation.Simulation `json:"simulation"`
+	Simulation *simulation.Simulation `json:"simulation"`
 }
 
 // results is called when a request is made to "/simulation/results/{simID}".

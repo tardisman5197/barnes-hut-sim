@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -12,7 +13,10 @@ import (
 )
 
 const (
-	StartURL string = "/start"
+	StartURL  string = "/start"
+	BaseURL   string = "http://localhost:5000/simulation"
+	NewURL    string = BaseURL + "/new"
+	StatusURL string =  "/status"
 )
 
 var testsStart = []struct {
@@ -21,6 +25,16 @@ var testsStart = []struct {
 	description string
 }{
 	{expected: http.StatusNotFound, given: "/t/10", description: "Non-existent simulation"},
+}
+
+var testsStatus = []struct {
+	expected    int
+	given       string
+	description string
+	body        string
+}{
+	{expected: http.StatusNotFound, given: "/1",
+		description: "Non-existent simulation", body: "there is no simulation with the simID 1\n"},
 }
 
 var simul = simulation.Simulation{
@@ -33,6 +47,39 @@ var simul = simulation.Simulation{
 }
 
 func addSimul(baseUrl string) {
+	res := createSimulation(baseUrl)
+
+	testsStart = append(testsStart, []struct {
+		expected    int
+		given       string
+		description string
+	}{
+		{expected: http.StatusOK, given: fmt.Sprintf("/%s/10", res.ID), description: "Normal use"},
+		{expected: http.StatusBadRequest, given: fmt.Sprintf("/%s/-1", res.ID), description: "Negative number of steps"},
+		{expected: http.StatusBadRequest, given: fmt.Sprintf("/%s/t", res.ID), description: "Non digit steps"},
+	}...)
+}
+
+
+func statusSimul(baseURL string){
+	res := createSimulation(baseURL)
+
+	testsStatus = append(testsStatus, []struct {
+		expected    int
+		given       string
+		description string
+		body        string
+	}{
+		{expected: http.StatusOK, given: fmt.Sprintf("/%s", res.ID),
+			description: "Existent simulation", body: fmt.Sprintf("{\"id\":\"%s\",\"step\":0}\n",
+			res.ID)},
+	}...)
+}
+
+func createSimulation(baseUrl string) struct {
+	ID         string                `json:"id"`
+	Simulation simulation.Simulation `json:"simulation"`
+} {
 	body, err := json.Marshal(simul)
 	if err != nil {
 		panic(err)
@@ -54,16 +101,7 @@ func addSimul(baseUrl string) {
 	if err != nil {
 		panic(err)
 	}
-
-	testsStart = append(testsStart, []struct {
-		expected    int
-		given       string
-		description string
-	}{
-		{expected: http.StatusOK, given: fmt.Sprintf("/%s/10", res.ID), description: "Normal use"},
-		{expected: http.StatusBadRequest, given: fmt.Sprintf("/%s/-1", res.ID), description: "Negative number of steps"},
-		{expected: http.StatusBadRequest, given: fmt.Sprintf("/%s/t", res.ID), description: "Non digit steps"},
-	}...)
+	return res
 }
 
 func TestStart(t *testing.T) {
@@ -91,12 +129,47 @@ func TestStart(t *testing.T) {
 	}
 }
 
+func TestStatus(t *testing.T) {
+	api := NewAPI()
+	srv := httptest.NewServer(api.router())
+	defer srv.Close()
+
+	simulationEndpoint := srv.URL + "/simulation"
+	statusSimul(simulationEndpoint)
+
+	t.Logf("testsStatus : %v", testsStatus)
+
+
+	for _, test := range testsStatus {
+		t.Logf("Test case: %s", test.description)
+		t.Logf("Get : %s", simulationEndpoint + StatusURL + test.given)
+		r, err := http.Get(simulationEndpoint + StatusURL + test.given)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer r.Body.Close()
+
+		if r.StatusCode != test.expected {
+			t.Fatalf("%s%s: expected %d, got %d", StatusURL, test.given, test.expected, r.StatusCode)
+		}
+		if len(test.description) > 0 {
+			bodyBytes, _ := ioutil.ReadAll(r.Body)
+			bodyString := string(bodyBytes)
+
+			if bodyString != test.body {
+				t.Fatalf("%s%s: expected %s, got %s", StatusURL, test.given, test.body,
+					bodyString)
+			}
+		}
+	}
+}
+
 func TestStatusApi(t *testing.T) {
 	api := NewAPI()
 	srv := httptest.NewServer(api.router())
 	defer srv.Close()
 
-	inputSimulation := simulation.Simulation{
+	inputSimulation := &simulation.Simulation{
 		Grav:  9.81,
 		Theta: 31,
 		Bodies: []simulation.Body{
@@ -151,7 +224,7 @@ func TestStatusApiWithInvalidSimID(t *testing.T) {
 	srv := httptest.NewServer(api.router())
 	defer srv.Close()
 
-	api.simulations["test_id"] = simulation.Simulation{}
+	api.simulations["test_id"] = &simulation.Simulation{}
 
 	resp, err := http.Get(srv.URL + "/simulation/results/invalid_test_id")
 	if err != nil {
