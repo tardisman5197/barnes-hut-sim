@@ -23,8 +23,8 @@ type Simulation struct {
 // NewSimulation returns an instance of a Simulation
 // struct. It initilises some simulation paramaters
 // and can optionally set the bodies for the simulation.
-func NewSimulation(grav, theta float64, bodies ...Body) Simulation {
-	return Simulation{
+func NewSimulation(grav, theta float64, bodies ...Body) *Simulation {
+	return &Simulation{
 		Grav:   grav,
 		Theta:  theta,
 		Bodies: bodies,
